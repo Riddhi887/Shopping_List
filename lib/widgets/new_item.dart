@@ -20,7 +20,8 @@ class _NewItemState extends State<NewItem> {
   var _enteredQuantity = 1;
   var _enteredCategory = categories[Categories.vegetables]!;
 
-  void _saveItem() {
+  //async and await is used to get the data or load the data to process it or get from the backend
+  void _saveItem() async {
     //checks if the form has the form key and will automatically reach out to the validator  of each form field
     if (_formKey.currentState!.validate()) {
       //save the entered value
@@ -36,32 +37,31 @@ class _NewItemState extends State<NewItem> {
       );
 
       //to add data to database we use POST method of http request
-      http.post(
+      final response = await http.post(
         url, //the one we created
         headers: {
           //metadata to be added in form of maps here tells what is the file format
           'Content-Type': 'application/json',
         },
         //encode is use to convert data automatically into json format we used map here
-        body: json.encode(
-          {
-            //data to be encoded
-            'name': _enteredName,
-            'quantity': _enteredQuantity,
-            'category': _enteredCategory.title,
-          }
-        )
+        body: json.encode({
+          //data to be encoded
+          'name': _enteredName,
+          'quantity': _enteredQuantity,
+          'category': _enteredCategory.title,
+        }),
       );
 
+      //response to get from the backend when the data is been post/ written to backend
+      // using the async and await above we wait for the response from backend when one operation is performed
+      print(response.body);
+      print(response.statusCode);
+
       //generate a new item and add to list
-     /* Navigator.of(context).pop(
-        GroceryItem(
-          id: DateTime.now().toString(),
-          name: _enteredName,
-          quantity: _enteredQuantity,
-          category: _enteredCategory,
-        ),
-      );*/
+      if (!context.mounted) {     //if the data is not the part of screen anymore we return 
+        return;
+      }
+      Navigator.of(context).pop();
     }
   }
 
