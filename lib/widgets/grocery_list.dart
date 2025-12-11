@@ -14,14 +14,17 @@ class GroceryList extends StatefulWidget {
 
 class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItem = [];
+  var _isLoading = true;
+
+  String? error; //it should be in string if it is notnull or else its var
 
   //we are initalizing a state using init state to send a get req to backend and get data as respose and the state should be maintained even after the restart or reload
 
   //initalize the state at start
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    _loadItems();
   }
 
   //initially load the items if any present in the database : used async
@@ -35,10 +38,24 @@ class _GroceryListState extends State<GroceryList> {
     //send a get request to get the data
     final response = await http.get(url);
 
+    //if error occurs find the status code
+    print(response.statusCode);
+    if (response.statusCode >= 400) {
+      setState(() {
+        error = "Failed to fetch data. Please try again later.";
+      });
+    }
+    //if database is empty it returns `null` as the body
+    if (response.body == 'null') {
+      setState(() {
+        _groceryItem = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
     //convert the console json data back to ui form
-    final Map<String, dynamic> listData = json.decode(
-      response.body,
-    );
+    final Map<String, dynamic> listData = json.decode(response.body);
 
     //create a empty list of loadedItems on list and will add one by one into this list individually
     final List<GroceryItem> _loadedItems = [];
@@ -61,14 +78,15 @@ class _GroceryListState extends State<GroceryList> {
           category: category,
         ),
       );
-
-      setState(() {
-        _groceryItem = _loadedItems;
-      });
-      
     }
 
-    print(response.body);
+    setState(() {
+      _groceryItem = _loadedItems;
+      _isLoading = false;
+    });
+
+    // useful for debugging
+    // print(response.body);
   }
 
   //get item to the empty list from the ui data use async and await
@@ -76,8 +94,6 @@ class _GroceryListState extends State<GroceryList> {
     final newItem = await Navigator.of(
       context,
     ).push<GroceryItem>(MaterialPageRoute(builder: (ctx) => const NewItem()));
-
-    _loadItems(); //load data
 
     if (newItem == null) {
       return;
@@ -89,10 +105,55 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
-  void removeItem(GroceryItem item) {
+  void removeItem(GroceryItem item) async {
+    //get the index
+    final index = _groceryItem.indexOf(item);
+
+    //set the state
     setState(() {
       _groceryItem.remove(item);
     });
+
+    final url = Uri.https(
+      'flutter-prep-76f0c-default-rtdb.firebaseio.com',
+      'shopping_list/${item.id}.json', // target specific item from shopping list and get id
+    );
+
+    //send a delete request
+    final response = await http.delete(url);
+
+    //if error occurs add back the item
+    if (response.statusCode >= 400) 
+    {
+      
+      //add back the item 
+      setState(() {
+        _groceryItem.insert(index,item);
+      });
+
+      //show error snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to delete item. Please try again.',style: TextStyle(color: Colors.black, fontWeight: FontWeight.normal),
+          ),
+          backgroundColor: const Color.fromARGB(255, 231, 250, 236),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+    else {
+
+      //show success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${item.name} deleted successfully!',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: const Color.fromARGB(255, 231, 250, 236),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -100,10 +161,14 @@ class _GroceryListState extends State<GroceryList> {
     //if no items are added
     Widget content = const Center(child: Text('Uh Oh! No items added yet.'));
 
+    //show loading indicator while fetching
+    if (_isLoading) {
+      content = const Center(child: CircularProgressIndicator());
+    }
     //if the items are added
-    if (_groceryItem.isNotEmpty) {
+    else if (_groceryItem.isNotEmpty) {
       //ListView is use to build optimise list and List Tile provide Optimised way to display data
-      //a flag telling which item velongs to which category
+      //a flag telling which item belongs to which category
 
       content = ListView.builder(
         itemCount: _groceryItem.length, //to go through all items on the list,
@@ -111,9 +176,12 @@ class _GroceryListState extends State<GroceryList> {
             //Dismissible to swipe the items out or delete it takes value key to uniquely identify each item
             Dismissible(
               onDismissed: (direction) {
-                removeItem(_groceryItem[index]);
+
+                
+                removeItem(_groceryItem[index],);
               },
               key: ValueKey(_groceryItem[index].id),
+              
 
               child: ListTile(
                 title: Text(
@@ -136,6 +204,11 @@ class _GroceryListState extends State<GroceryList> {
               ),
             ),
       );
+    }
+
+    //if error is null or doesnot found any error
+    if (error != null) {
+      content = Center(child: Text(error!));
     }
     return Scaffold(
       appBar: AppBar(

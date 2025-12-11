@@ -19,6 +19,7 @@ class _NewItemState extends State<NewItem> {
   var _enteredName = '';
   var _enteredQuantity = 1;
   var _enteredCategory = categories[Categories.vegetables]!;
+  var _isSending = false;
 
   //async and await is used to get the data or load the data to process it or get from the backend
   void _saveItem() async {
@@ -26,6 +27,10 @@ class _NewItemState extends State<NewItem> {
     if (_formKey.currentState!.validate()) {
       //save the entered value
       _formKey.currentState!.save();
+
+      setState(() {
+        _isSending = true;
+      });
 
       //to save the data on the backend (firebase) database we created using http request
 
@@ -57,11 +62,22 @@ class _NewItemState extends State<NewItem> {
       print(response.body);
       print(response.statusCode);
 
+      //geting id from json into ui format
+      final Map<String, dynamic> resData = json.decode(response.body);
+
       //generate a new item and add to list
-      if (!context.mounted) {     //if the data is not the part of screen anymore we return 
+      if (!context.mounted) {
+        //if the data is not the part of screen anymore we return
         return;
       }
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(
+        GroceryItem(
+          id: resData['name'],
+          name: _enteredName,
+          quantity: _enteredQuantity,
+          category: _enteredCategory,
+        ),
+      );
     }
   }
 
@@ -168,9 +184,12 @@ class _NewItemState extends State<NewItem> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        _formKey.currentState!.reset();
-                      },
+                      //onPressing the button there must be loading sign visible then the button becomes unpressable
+                      onPressed: _isSending
+                          ? null
+                          : () {
+                              _formKey.currentState!.reset();
+                            },
                       child: Text(
                         'Reset',
                         style: Theme.of(context).textTheme.bodyLarge,
@@ -178,11 +197,18 @@ class _NewItemState extends State<NewItem> {
                     ),
                     const SizedBox(width: 15),
                     ElevatedButton(
-                      onPressed: _saveItem,
-                      child: Text(
-                        'Add Item',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
+                      onPressed: _isSending ? null : _saveItem,
+
+                      child: _isSending
+                          ? SizedBox(
+                              height: 17,
+                              width: 17,
+                              child: CircularProgressIndicator(),
+                            )
+                          : Text(
+                              'Add Item',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
                     ),
                   ],
                 ),
