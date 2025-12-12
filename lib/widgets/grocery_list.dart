@@ -35,58 +35,69 @@ class _GroceryListState extends State<GroceryList> {
       'shopping_list.json',
     );
 
-    //send a get request to get the data
-    final response = await http.get(url);
+    try {
+      //send a get request to get the data
+      final response = await http.get(url);
 
-    //if error occurs find the status code
-    print(response.statusCode);
-    if (response.statusCode >= 400) {
+      print(response.statusCode);
+      if (response.statusCode >= 400) {
+        setState(() {
+          error = "Failed to fetch data. Please try again later.";
+        });
+      }
+
+      //if database is empty it returns `null` as the body
+      //all items deleted from list then we see loading state due error as data being null there to solve this
+      print(response.body);
+      if (response.body == 'null') {
+        setState(() {
+          _groceryItem = [];
+          _isLoading = false;
+        });
+        return;
+      }
+
+      //convert the console json data back to ui form
+      final Map<String, dynamic> listData = json.decode(response.body);
+
+      //create a empty list of loadedItems on list and will add one by one into this list individually
+      final List<GroceryItem> _loadedItems = [];
+
+      //display item using loop from above map
+      for (final item in listData.entries) {
+        //create temporary category item to match the http req value with local memory data provided in grocer_item.dart
+        final category = categories.entries
+            .firstWhere(
+              (catItem) => catItem.value.title == item.value['category'],
+            )
+            .value;
+
+        //add the data
+        _loadedItems.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
+
       setState(() {
-        error = "Failed to fetch data. Please try again later.";
-      });
-    }
-    //if database is empty it returns `null` as the body
-    if (response.body == 'null') {
-      setState(() {
-        _groceryItem = [];
+        _groceryItem = _loadedItems;
         _isLoading = false;
       });
-      return;
+
+      // useful for debugging
+      // print(response.body);
+    } catch (e) {
+      setState(() {
+        error = 'Something went wrong. Please try again.';
+        _isLoading = false;
+      });
     }
 
-    //convert the console json data back to ui form
-    final Map<String, dynamic> listData = json.decode(response.body);
-
-    //create a empty list of loadedItems on list and will add one by one into this list individually
-    final List<GroceryItem> _loadedItems = [];
-
-    //display item using loop from above map
-    for (final item in listData.entries) {
-      //create temporary category item to match the http req value with local memory data provided in grocer_item.dart
-      final category = categories.entries
-          .firstWhere(
-            (catItem) => catItem.value.title == item.value['category'],
-          )
-          .value;
-
-      //add the data
-      _loadedItems.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ),
-      );
-    }
-
-    setState(() {
-      _groceryItem = _loadedItems;
-      _isLoading = false;
-    });
-
-    // useful for debugging
-    // print(response.body);
+    //if error occurs find the status code
   }
 
   //get item to the empty list from the ui data use async and await
@@ -123,30 +134,32 @@ class _GroceryListState extends State<GroceryList> {
     final response = await http.delete(url);
 
     //if error occurs add back the item
-    if (response.statusCode >= 400) 
-    {
-      
-      //add back the item 
+    if (response.statusCode >= 400) {
+      //add back the item
       setState(() {
-        _groceryItem.insert(index,item);
+        _groceryItem.insert(index, item);
       });
 
       //show error snackbar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Failed to delete item. Please try again.',style: TextStyle(color: Colors.black, fontWeight: FontWeight.normal),
+          content: const Text(
+            'Failed to delete item. Please try again.',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.normal,
+            ),
           ),
           backgroundColor: const Color.fromARGB(255, 231, 250, 236),
           duration: const Duration(seconds: 3),
         ),
       );
-    }
-    else {
-
+    } else {
       //show success snackbar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${item.name} deleted successfully!',
+          content: Text(
+            '${item.name} deleted successfully!',
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           ),
           backgroundColor: const Color.fromARGB(255, 231, 250, 236),
@@ -176,12 +189,9 @@ class _GroceryListState extends State<GroceryList> {
             //Dismissible to swipe the items out or delete it takes value key to uniquely identify each item
             Dismissible(
               onDismissed: (direction) {
-
-                
-                removeItem(_groceryItem[index],);
+                removeItem(_groceryItem[index]);
               },
               key: ValueKey(_groceryItem[index].id),
-              
 
               child: ListTile(
                 title: Text(
